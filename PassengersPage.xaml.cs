@@ -86,8 +86,8 @@ namespace Buses_Try_14
             LoadPassengersData(); // Загрузить всех
         }
 
-        // --- Логика для удаления (если решите добавить кнопку) ---
-        /*
+
+
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
             var passengerToDelete = DGridPassengers.SelectedItem as Passangers;
@@ -121,19 +121,19 @@ namespace Buses_Try_14
                         var passengerInDb = context.Passangers.Find(passengerToDelete.Id);
                         if (passengerInDb != null)
                         {
-                             context.Passangers.Remove(passengerInDb);
-                             context.SaveChanges();
-                             MessageBox.Show("Пассажир успешно удален.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
-                             LoadPassengersData(TxtSearchLastName.Text); // Обновляем список
+                            context.Passangers.Remove(passengerInDb);
+                            context.SaveChanges();
+                            MessageBox.Show("Пассажир успешно удален.", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                            LoadPassengersData(TxtSearchLastName.Text); // Обновляем список
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                     MessageBox.Show($"Ошибка при удалении пассажира: {ex.Message}", "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"Ошибка при удалении пассажира: {ex.Message}", "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
-        */
+
     }
 }
