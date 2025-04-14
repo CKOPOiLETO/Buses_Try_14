@@ -196,11 +196,47 @@ namespace Buses_Try_14
                 MessageBox.Show("Информация о рейсе успешно сохранена!", "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
                 Manager.MainFrame.GoBack(); // Возвращаемся на предыдущую страницу (список рейсов)
             }
-            catch (Exception ex)
+            catch (System.Data.Entity.Validation.DbEntityValidationException dbEx) // Сначала ловим ошибки валидации EF
             {
-                MessageBox.Show($"Ошибка при сохранении данных: {ex.Message}\n\nВнутренняя ошибка:\n{ex.InnerException?.Message}",
-                               "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
-                // Можно добавить логирование ошибки
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Ошибка валидации при сохранении:");
+                foreach (var validationErrors in dbEx.EntityValidationErrors)
+                {
+                    sb.AppendFormat("- Сущность типа \"{0}\" в состоянии \"{1}\" имеет ошибки валидации:\n",
+                        validationErrors.Entry.Entity.GetType().Name, validationErrors.Entry.State);
+                    foreach (var validationError in validationErrors.ValidationErrors)
+                    {
+                        sb.AppendFormat("-- Свойство: {0}, Ошибка: {1}\n",
+                            validationError.PropertyName, validationError.ErrorMessage);
+                    }
+                }
+                MessageBox.Show(sb.ToString(), "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (System.Data.Entity.Infrastructure.DbUpdateException dbUpdateEx) // Затем ловим ошибки обновления БД
+            {
+                // Пытаемся добраться до самого глубокого внутреннего исключения (часто от SQL Server)
+                Exception innerEx = dbUpdateEx;
+                while (innerEx.InnerException != null)
+                {
+                    innerEx = innerEx.InnerException;
+                }
+
+                string fullMessage = $"Ошибка обновления базы данных:\n{dbUpdateEx.Message}\n\n";
+                // Добавляем информацию из записей, вызвавших ошибку (если доступно)
+                // foreach (var entry in dbUpdateEx.Entries) {
+                //    fullMessage += $"Сущность: {entry.Entity.GetType().Name} в состоянии {entry.State}\n";
+                // }
+                fullMessage += $"\nСамая вложенная ошибка:\n{innerEx.Message}";
+
+
+                MessageBox.Show(fullMessage, "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex) // Общий обработчик для других ошибок
+            {
+                // Желательно логировать полное исключение ex.ToString() для диагностики
+                System.Diagnostics.Debug.WriteLine($"General Error Saving Data: {ex.ToString()}"); // Вывод в окно Output
+                MessageBox.Show($"Произошла общая ошибка при сохранении: {ex.Message}",
+                                "Непредвиденная ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

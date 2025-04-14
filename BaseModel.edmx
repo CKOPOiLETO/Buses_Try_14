@@ -47,7 +47,7 @@
           <Key>
             <PropertyRef Name="Id" />
           </Key>
-          <Property Name="Id" Type="int" Nullable="false" />
+          <Property Name="Id" Type="int" StoreGeneratedPattern="Identity" Nullable="false" />
           <Property Name="RouteID" Type="int" Nullable="false" />
           <Property Name="DepartureData" Type="date" Nullable="false" />
           <Property Name="DepartureTime" Type="time" Precision="7" Nullable="false" />

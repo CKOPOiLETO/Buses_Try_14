@@ -19,7 +19,6 @@ namespace Buses_Try_14
         {
             this.Schedules = new HashSet<Schedules>();
         }
-
         public string RouteDescription => $"{DepartuePoint} - {Destination} ({DistanceKM} км)";
         public int Id { get; set; }
         public string DepartuePoint { get; set; }
