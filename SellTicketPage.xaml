@@ -1,0 +1,39 @@
+﻿<Page x:Class="Buses_Try_14.SellTicketPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Buses_Try_14"
+      mc:Ignorable="d"
+      d:DesignHeight="400" d:DesignWidth="550"
+      Title="Продажа билета">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="Рейс:" Grid.Row="0" Grid.Column="0" FontWeight="Bold" Margin="0,0,10,10" VerticalAlignment="Top"/>
+        <TextBlock x:Name="TextBlockScheduleInfo" Grid.Row="0" Grid.Column="1" Margin="0,0,0,10" TextWrapping="Wrap" VerticalAlignment="Top"/>
+
+        <TextBlock Text="Пассажир:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,5"/>
+        <ComboBox x:Name="ComboPassengers" Grid.Row="1" Grid.Column="1" Margin="0,0,0,5"
+                  DisplayMemberPath="FullName" IsEditable="True" IsTextSearchEnabled="True" TextSearch.TextPath="FullName"/>
+        <Button Name="BtnAddNewPassenger" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left"
+                Content="Добавить нового пассажира..." Click="BtnAddNewPassenger_Click" Margin="0,0,0,10" FontSize="11"/>
+
+        <TextBlock Text="Цена (руб.):" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,5"/>
+        <TextBox x:Name="TextBoxPrice" Grid.Row="3" Grid.Column="1" Margin="0,0,0,5" PreviewTextInput="TextBoxPrice_PreviewTextInput"/>
+        <Button Content="Оформить билет" Name="BtnConfirmPurchase" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
+                HorizontalAlignment="Center" Padding="20, 10" Margin="10" Click="BtnConfirmPurchase_Click" FontWeight="Bold"/>
+    </Grid>
+</Page>

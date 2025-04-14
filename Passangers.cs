@@ -19,7 +19,8 @@ namespace Buses_Try_14
         {
             this.Tickets = new HashSet<Tickets>();
         }
-    
+        public string FullName => $"{LastName} {FirstName} {MiddleName}".Trim();
+
         public int Id { get; set; }
         public string LastName { get; set; }
         public string FirstName { get; set; }

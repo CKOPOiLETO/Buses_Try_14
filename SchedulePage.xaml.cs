@@ -136,5 +136,86 @@ namespace Buses_Try_14
                 }
             }
         }
+
+        private void BtnGoToPassengers_Click(object sender, RoutedEventArgs e)
+        {
+            Manager.MainFrame.Navigate(new PassengersPage());
+        }
+
+        // В SchedulePage.xaml.cs
+
+        // Обработчик для новой кнопки
+        private void BtnSellTicket_Click(object sender, RoutedEventArgs e)
+        {
+            // Получаем выбранный рейс из DataGrid
+            var selectedSchedule = DGridSchedules.SelectedItem as Schedules; // Убедитесь, что SelectionMode="Single" или Extended
+
+            if (selectedSchedule == null)
+            {
+                MessageBox.Show("Пожалуйста, выберите рейс из списка для продажи билета.", "Внимание", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // --- Проверка наличия мест ---
+            int availableSeats = CalculateAvailableSeats(selectedSchedule.Id);
+            if (availableSeats == -1) // Ошибка при расчете
+            {
+                return; // Сообщение об ошибке уже было показано в CalculateAvailableSeats
+            }
+            if (availableSeats <= 0)
+            {
+                MessageBox.Show("На выбранный рейс нет свободных мест.", "Нет мест", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Если места есть, переходим на страницу продажи, передав ID рейса
+            Manager.MainFrame.Navigate(new SellTicketPage(selectedSchedule.Id));
+        }
+
+        // Вспомогательный метод для расчета свободных мест
+        private int CalculateAvailableSeats(int scheduleId)
+        {
+            try // Обернем в try-catch на случай ошибок БД
+            {
+                using (var context = new BusStationEntities())
+                {
+                    // Получаем рейс ВМЕСТЕ с автобусом, чтобы знать общее кол-во мест
+                    var schedule = context.Schedules
+                                          .Include(s => s.Buses) // Важно подгрузить автобус
+                                          .FirstOrDefault(s => s.Id == scheduleId);
+
+                    if (schedule == null || schedule.Buses == null)
+                    {
+                        MessageBox.Show($"Не удалось получить информацию о рейсе (ID={scheduleId}) или связанном автобусе.", "Ошибка данных", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return -1; // Признак ошибки
+                    }
+
+                    int totalSeats = schedule.Buses.CountOfSeats;
+                    // Считаем уже проданные билеты на этот рейс
+                    int soldSeats = context.Tickets.Count(t => t.ScheduleID == scheduleId);
+                    return totalSeats - soldSeats;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при расчете свободных мест: {ex.Message}", "Ошибка БД", MessageBoxButton.OK, MessageBoxImage.Error);
+                return -1; // Признак ошибки
+            }
+        }
+
+        private void BtnViewPassengers_Click(object sender, RoutedEventArgs e)
+        {
+            // Получаем выбранный рейс из DataGrid
+            var selectedSchedule = DGridSchedules.SelectedItem as Schedules;
+
+            if (selectedSchedule == null)
+            {
+                MessageBox.Show("Пожалуйста, выберите рейс из списка для просмотра пассажиров.", "Внимание", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Переходим на новую страницу, передав ID выбранного рейса
+            Manager.MainFrame.Navigate(new ViewPassengersOnSchedulePage(selectedSchedule.Id));
+        }
     }
 }
