@@ -29,26 +29,54 @@ namespace Buses_Try_14
         }
 
         // Метод для загрузки и отображения данных
-        private void LoadScheduleData()
+        // Обновленный метод для загрузки данных с учетом фильтров
+        private void LoadScheduleData(string departureFilter = null, string destinationFilter = null, DateTime? dateFilter = null)
         {
-            try
+            using (var context = new BusStationEntities())
             {
-                // Получаем свежий контекст
-                var currentContext = BusStationEntities.GetContext();
-                // Явно подгружаем связанные данные Routes и Buses
-                var scheduleList = currentContext.Schedules
-                                                .Include(s => s.Routes)
-                                                .Include(s => s.Buses)
-                                                .OrderBy(s => s.DepartureData).ThenBy(s => s.DepartureTime) // Сортировка для порядка
-                                                .ToList();
+                try
+                {
+                    // Начинаем с базового запроса, включая связанные сущности
+                    IQueryable<Schedules> query = context.Schedules
+                                                         .Include(s => s.Routes)
+                                                         .Include(s => s.Buses);
 
-                // Устанавливаем источник данных для DataGrid (как просили - в коде)
-                DGridSchedules.ItemsSource = scheduleList;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка загрузки данных: {ex.Message}\n\nВнутренняя ошибка:\n{ex.InnerException?.Message}",
-                                "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
+                    // Применяем фильтр по пункту отправления (по подстроке, без учета регистра)
+                    if (!string.IsNullOrWhiteSpace(departureFilter))
+                    {
+                        string lowerDepartureFilter = departureFilter.ToLower();
+                        query = query.Where(s => s.Routes.DepartuePoint.ToLower().Contains(lowerDepartureFilter));
+                    }
+
+                    // Применяем фильтр по пункту назначения (по подстроке, без учета регистра)
+                    if (!string.IsNullOrWhiteSpace(destinationFilter))
+                    {
+                        string lowerDestinationFilter = destinationFilter.ToLower();
+                        query = query.Where(s => s.Routes.Destination.ToLower().Contains(lowerDestinationFilter));
+                    }
+
+                    // Применяем фильтр по дате (точное совпадение дня, месяца, года)
+                    if (dateFilter.HasValue)
+                    {
+                        DateTime dateToFilter = dateFilter.Value.Date; // Убираем время из выбранной даты
+                        // Используем DbFunctions.TruncateTime для сравнения только дат в базе данных
+                        query = query.Where(s => DbFunctions.TruncateTime(s.DepartureData) == dateToFilter);
+                    }
+
+                    // Выполняем итоговый запрос с сортировкой
+                    var scheduleList = query.OrderBy(s => s.DepartureData) // Сортируем по дате
+                                            .ThenBy(s => s.DepartureTime) // Затем по времени
+                                            .ToList();
+
+                    // Устанавливаем результат как источник данных для DataGrid
+                    DGridSchedules.ItemsSource = scheduleList;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка загрузки данных: {ex.Message}\n\nВнутренняя ошибка:\n{ex.InnerException?.Message}",
+                                    "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
+                    DGridSchedules.ItemsSource = null; // Очищаем грид в случае ошибки
+                }
             }
         }
 
@@ -57,12 +85,8 @@ namespace Buses_Try_14
         {
             if (Visibility == Visibility.Visible)
             {
-                // Обновляем данные из БД при каждом показе страницы
-                // Важно! Это обновит данные, если они были изменены на других страницах
-                // Сбрасываем старый контекст, если он был статическим и долгоживущим
-                // BusStationEntities._context = null; // Если GetContext() реально создает новый при _context == null
-                // Мы будем использовать GetContext() для каждой операции, чтобы избежать проблем с кэшированием
-                LoadScheduleData();
+                // Загружаем данные с учетом текущих значений в полях фильтров
+                LoadScheduleData(TxtFilterDeparture.Text, TxtFilterDestination.Text, DpFilterDate.SelectedDate);
             }
         }
 
@@ -216,6 +240,22 @@ namespace Buses_Try_14
 
             // Переходим на новую страницу, передав ID выбранного рейса
             Manager.MainFrame.Navigate(new ViewPassengersOnSchedulePage(selectedSchedule.Id));
+        }
+
+        private void BtnApplyFilters_Click(object sender, RoutedEventArgs e)
+        {
+            LoadScheduleData(TxtFilterDeparture.Text, TxtFilterDestination.Text, DpFilterDate.SelectedDate);
+        }
+
+        private void BtnResetFilters_Click(object sender, RoutedEventArgs e)
+        {
+            // Очищаем поля ввода фильтров
+            TxtFilterDeparture.Text = "";
+            TxtFilterDestination.Text = "";
+            DpFilterDate.SelectedDate = null; // Сбрасываем выбранную дату
+
+            // Загружаем все данные без фильтров
+            LoadScheduleData();
         }
     }
 }

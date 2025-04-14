@@ -5,16 +5,32 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Buses_Try_14"
       mc:Ignorable="d"
-      d:DesignHeight="450" d:DesignWidth="800"
-      Title="Расписание рейсов" IsVisibleChanged="Page_IsVisibleChanged">
+      d:DesignHeight="500" d:DesignWidth="850" Title="Расписание рейсов" IsVisibleChanged="Page_IsVisibleChanged">
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <DataGrid x:Name="DGridSchedules" Grid.Row="0" AutoGenerateColumns="False" IsReadOnly="True"
+        <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Откуда:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="TxtFilterDeparture" Width="140" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по пункту отправления"/>
+
+                <TextBlock Text="Куда:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="TxtFilterDestination" Width="140" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по пункту назначения"/>
+
+                <TextBlock Text="Дата:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <DatePicker x:Name="DpFilterDate" Width="130" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по дате отправления"/>
+
+                <Button Content="Применить" Name="BtnApplyFilters" Click="BtnApplyFilters_Click" Padding="10,3" Margin="10,0,5,0" VerticalAlignment="Center" ToolTip="Применить выбранные фильтры"/>
+                <Button Content="Сбросить" Name="BtnResetFilters" Click="BtnResetFilters_Click" Padding="10,3" VerticalAlignment="Center" ToolTip="Очистить все фильтры"/>
+            </StackPanel>
+        </Border>
+
+        <DataGrid x:Name="DGridSchedules" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
                   SelectionMode="Extended">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Пункт отправления" Binding="{Binding Routes.DepartuePoint}" Width="*"/>
@@ -33,11 +49,10 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Stretch" Margin="10">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Stretch" Margin="10">
             <Button Content="Добавить рейс" Name="BtnAdd" Click="BtnAdd_Click" Padding="10,5" Margin="0,0,10,0"/>
             <Button Content="Удалить рейс(ы)" Name="BtnDelete" Click="BtnDelete_Click" Padding="10,5" Background="LightCoral"/>
-            <Button Content="Пассажиры" HorizontalAlignment="Left" Margin="80,5,0,5" Padding="10,2"
-        Name="BtnGoToPassengers" Click="BtnGoToPassengers_Click"/>
+            <Button Content="Пассажиры" Name="BtnGoToPassengers" Click="BtnGoToPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Продать билет" Name="BtnSellTicket" Click="BtnSellTicket_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Пассажиры рейса" Name="BtnViewPassengers" Click="BtnViewPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
         </StackPanel>
