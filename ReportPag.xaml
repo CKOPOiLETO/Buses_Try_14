@@ -1,0 +1,15 @@
+﻿<Page x:Class="Buses_Try_14.ReportPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+       xmlns:local="clr-namespace:Buses_Try_14" xmlns:wf="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
+       xmlns:rv="clr-namespace:Microsoft.Reporting.WinForms;assembly=Microsoft.ReportViewer.WinForms"
+       mc:Ignorable="d"
+       d:DesignHeight="600" d:DesignWidth="800"
+       Title="Отчет по автобусам" Loaded="Page_Loaded">
+    <Grid>
+        <WindowsFormsHost x:Name="WindowsFormsHost">
+            <rv:ReportViewer x:Name="ReportViewer"/>
+        </WindowsFormsHost>
+    </Grid>
+</Page>

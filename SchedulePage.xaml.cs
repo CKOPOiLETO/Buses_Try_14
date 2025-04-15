@@ -257,5 +257,10 @@ namespace Buses_Try_14
             // Загружаем все данные без фильтров
             LoadScheduleData();
         }
+
+        private void BtnGoToReport_Click(object sender, RoutedEventArgs e)
+        {
+            Manager.MainFrame.Navigate(new ReportPage());
+        }
     }
 }

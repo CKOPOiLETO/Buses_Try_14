@@ -39,6 +39,7 @@
                 <DataGridTextColumn Header="Время отправления" Binding="{Binding DepartureTime, StringFormat='hh\\:mm'}" Width="120"/>
                 <DataGridTextColumn Header="Время прибытия" Binding="{Binding ArrivalTime, StringFormat='hh\\:mm'}" Width="120"/>
                 <DataGridTextColumn Header="Номер автобуса" Binding="{Binding Buses.Number}" Width="100"/>
+                
                 <DataGridTemplateColumn Width="auto" Header="Действие">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -55,6 +56,9 @@
             <Button Content="Пассажиры" Name="BtnGoToPassengers" Click="BtnGoToPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Продать билет" Name="BtnSellTicket" Click="BtnSellTicket_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Пассажиры рейса" Name="BtnViewPassengers" Click="BtnViewPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
+            <Button Content="Отчет по автобусам" HorizontalAlignment="Left" Margin="160,5,0,5" Padding="10,2"
+        Name="BtnGoToReport" Click="BtnGoToReport_Click"/>
+            
         </StackPanel>
 
     </Grid>
