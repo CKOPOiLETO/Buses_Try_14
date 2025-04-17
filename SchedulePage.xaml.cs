@@ -13,6 +13,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Data.Entity; // <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+using System.Runtime.InteropServices; // Для Marshal.ReleaseComObject
+using Excel = Microsoft.Office.Interop.Excel; // Псевдоним для удобства
+using Microsoft.Win32;
 
 
 namespace Buses_Try_14
@@ -261,6 +264,215 @@ namespace Buses_Try_14
         private void BtnGoToReport_Click(object sender, RoutedEventArgs e)
         {
             Manager.MainFrame.Navigate(new ReportPage());
+        }
+
+        private void BtnExportToExcel_Click(object sender, RoutedEventArgs e)
+        {
+            // 1. Получаем ВСЕ данные расписания (без фильтров UI)
+            List<Schedules> allSchedules;
+            try
+            {
+                using (var context = new BusStationEntities())
+                {
+                    allSchedules = context.Schedules
+                                        .Include(s => s.Routes) // Включаем Маршруты
+                                        .Include(s => s.Buses)  // Включаем Автобусы
+                                        .Where(s => s.Routes != null && s.Buses != null) // Исключаем рейсы без маршрута или автобуса
+                                        .OrderBy(s => s.Routes.DepartuePoint) // Сначала сортируем по маршруту
+                                        .ThenBy(s => s.Routes.Destination)
+                                        .ThenBy(s => s.DepartureData)      // Затем по дате
+                                        .ThenBy(s => s.DepartureTime)      // Затем по времени
+                                        .ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных для экспорта: {ex.Message}", "Ошибка данных", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+
+            if (!allSchedules.Any())
+            {
+                MessageBox.Show("Нет данных для экспорта.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 2. Группируем рейсы по маршруту
+            // Группируем по RouteID, но сохраняем и имя для заголовка листа
+            var groupedByRoute = allSchedules
+                .GroupBy(s => new { s.RouteID, RouteName = $"{s.Routes.DepartuePoint} - {s.Routes.Destination}" })
+                .OrderBy(g => g.Key.RouteName); // Сортируем группы по имени маршрута
+
+            // 3. Создаем Excel приложение и книгу
+            Excel.Application excelApp = null;
+            Excel.Workbook workbook = null;
+
+            try
+            {
+                excelApp = new Excel.Application();
+                // excelApp.Visible = true; // Можно сделать видимым для отладки
+                excelApp.DisplayAlerts = false; // Отключаем стандартные окна Excel
+                workbook = excelApp.Workbooks.Add(Type.Missing); // Добавляем новую книгу
+
+                int sheetIndex = 0;
+
+                // 4. Создаем лист для каждого маршрута
+                foreach (var routeGroup in groupedByRoute)
+                {
+                    sheetIndex++;
+                    Excel.Worksheet worksheet = null;
+
+                    // Получаем или добавляем лист
+                    if (sheetIndex == 1 && workbook.Sheets.Count >= 1)
+                    {
+                        worksheet = (Excel.Worksheet)workbook.Sheets[1]; // Используем первый лист
+                    }
+                    else
+                    {
+                        worksheet = (Excel.Worksheet)workbook.Sheets.Add(After: workbook.Sheets[workbook.Sheets.Count]); // Добавляем новый лист в конец
+                    }
+
+                    // --- Настройка Листа ---
+                    // Задаем имя листа (очищаем от недопустимых символов и обрезаем до 31)
+                    string routeName = routeGroup.Key.RouteName;
+                    string safeSheetName = string.Join("_", routeName.Split(System.IO.Path.GetInvalidFileNameChars())).Replace(":", "-");
+                    if (safeSheetName.Length > 31) safeSheetName = safeSheetName.Substring(0, 31);
+                    if (string.IsNullOrWhiteSpace(safeSheetName)) safeSheetName = $"Route_{routeGroup.Key.RouteID}";
+                    worksheet.Name = safeSheetName;
+
+                    int currentRow = 1; // Начинаем с первой строки
+
+                    // Заголовок листа
+                    worksheet.Cells[currentRow, 1] = $"История рейсов: {routeName}";
+                    Excel.Range headerRange = worksheet.Range[worksheet.Cells[currentRow, 1], worksheet.Cells[currentRow, 6]]; // Объединяем 6 ячеек
+                    headerRange.Merge();
+                    headerRange.Font.Bold = true;
+                    headerRange.Font.Size = 14;
+                    headerRange.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+                    currentRow += 2; // Пропускаем строку
+
+                    // Заголовки столбцов
+                    int startDataRow = currentRow; // Запоминаем начало строк с данными
+                    worksheet.Cells[currentRow, 1] = "Дата";
+                    worksheet.Cells[currentRow, 2] = "Время отпр.";
+                    worksheet.Cells[currentRow, 3] = "Время приб.";
+                    worksheet.Cells[currentRow, 4] = "Автобус №";
+                    worksheet.Cells[currentRow, 5] = "Тип автобуса";
+                    worksheet.Cells[currentRow, 6] = "Мест";
+                    // Можно добавить еще столбцы: Пассажиров, Выручка и т.д., если нужно считать
+                    Excel.Range titleRange = worksheet.Range[worksheet.Cells[currentRow, 1], worksheet.Cells[currentRow, 6]]; // Выделяем заголовки
+                    titleRange.Font.Bold = true;
+                    titleRange.Borders.LineStyle = Excel.XlLineStyle.xlContinuous; // Добавляем границы
+                    titleRange.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
+                    currentRow++;
+
+                    // --- Заполнение Данными ---
+                    foreach (var schedule in routeGroup.OrderBy(s => s.DepartureData).ThenBy(s => s.DepartureTime))
+                    {
+                        // Внутри цикла foreach (var schedule in routeGroup...)
+
+                        // Запись даты обычно проходит нормально
+                        worksheet.Cells[currentRow, 1] = schedule.DepartureData;
+
+                        // Преобразуем TimeSpan в дробное число дней для Excel
+                        worksheet.Cells[currentRow, 2] = schedule.DepartureTime.TotalDays;
+                        worksheet.Cells[currentRow, 3] = schedule.ArrivalTime.TotalDays;
+
+                        // Остальные присваивания
+                        worksheet.Cells[currentRow, 4] = schedule.Buses?.Number;
+                        worksheet.Cells[currentRow, 5] = schedule.Buses?.Type;
+                        worksheet.Cells[currentRow, 6] = schedule.Buses?.CountOfSeats;
+                        currentRow++;
+                    }
+
+                    // --- Форматирование столбцов (ПОСЛЕ ЗАПИСИ ВСЕХ ДАННЫХ) ---
+                    // Форматируем весь диапазон данных для скорости (от startDataRow до currentRow-1)
+                    if (currentRow - 1 >= startDataRow) // Проверяем, были ли данные вообще
+                    {
+                        Excel.Range dateDataRange = worksheet.Range[worksheet.Cells[startDataRow, 1], worksheet.Cells[currentRow - 1, 1]];
+                        dateDataRange.NumberFormat = "dd.MM.yyyy"; // Стандартный формат даты
+
+                        Excel.Range timeDataRange1 = worksheet.Range[worksheet.Cells[startDataRow, 2], worksheet.Cells[currentRow - 1, 2]];
+                        timeDataRange1.NumberFormat = "hh:mm"; // Стандартный формат времени
+
+                        Excel.Range timeDataRange2 = worksheet.Range[worksheet.Cells[startDataRow, 3], worksheet.Cells[currentRow - 1, 3]];
+                        timeDataRange2.NumberFormat = "hh:mm"; // Стандартный формат времени
+
+                        // Можно добавить форматирование для числовых колонок автобуса, если нужно
+                        // Excel.Range busNumberRange = worksheet.Range[worksheet.Cells[startDataRow, 4], worksheet.Cells[currentRow - 1, 4]];
+                        // busNumberRange.NumberFormat = "0"; // Как целое число
+                        // Excel.Range busSeatsRange = worksheet.Range[worksheet.Cells[startDataRow, 6], worksheet.Cells[currentRow - 1, 6]];
+                        // busSeatsRange.NumberFormat = "0";
+                    }
+
+                    // Автоподбор ширины столбцов (вызываем один раз для всего листа после всех операций)
+                    worksheet.Columns.AutoFit();
+
+                    // Освобождаем COM объект листа (важно делать в цикле)
+                    if (worksheet != null) Marshal.ReleaseComObject(worksheet);
+                    worksheet = null;
+
+                } // Конец цикла по маршрутам
+
+
+                // 5. Удаление лишних листов (если Excel создал больше, чем нужно)
+                // Excel часто создает 3 листа по умолчанию. Удалим те, что не использовали.
+                while (workbook.Sheets.Count > sheetIndex)
+                {
+                    // Удаляем последний лист, пока количество не совпадет с нужным
+                    ((Excel.Worksheet)workbook.Sheets[workbook.Sheets.Count]).Delete();
+                }
+
+
+                // 6. Сохранение файла
+                SaveFileDialog saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "Книга Excel (*.xlsx)|*.xlsx|Книга Excel 97-2003 (*.xls)|*.xls",
+                    Title = "Сохранить отчет по рейсам",
+                    FileName = $"BusSchedulesReport_{DateTime.Now:yyyyMMdd}.xlsx"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    // Определяем формат сохранения по выбранному фильтру
+                    Excel.XlFileFormat fileFormat = saveFileDialog.FilterIndex == 1 ?
+                        Excel.XlFileFormat.xlOpenXMLWorkbook : // .xlsx
+                        Excel.XlFileFormat.xlWorkbookNormal;   // .xls
+
+                    workbook.SaveAs(saveFileDialog.FileName, fileFormat, Type.Missing, Type.Missing,
+                                    false, false, Excel.XlSaveAsAccessMode.xlNoChange,
+                                    Excel.XlSaveConflictResolution.xlUserResolution, true,
+                                    Type.Missing, Type.Missing, Type.Missing);
+                    MessageBox.Show($"Отчет успешно сохранен в файл:\n{saveFileDialog.FileName}", "Экспорт завершен", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                // Если пользователь не выбрал файл, просто закрываем без сохранения
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при экспорте в Excel: {ex.Message}\n{ex.StackTrace}", "Ошибка экспорта", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // 7. ОЧЕНЬ ВАЖНО: Закрытие Excel и освобождение COM объектов
+                if (workbook != null)
+                {
+                    workbook.Close(false, Type.Missing, Type.Missing); // Закрываем книгу без сохранения изменений (уже сохранили через SaveAs)
+                    Marshal.ReleaseComObject(workbook);
+                    workbook = null;
+                }
+                if (excelApp != null)
+                {
+                    excelApp.Quit();
+                    Marshal.ReleaseComObject(excelApp);
+                    excelApp = null;
+                }
+                // Запускаем сборку мусора для надежности
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+
         }
     }
 }
