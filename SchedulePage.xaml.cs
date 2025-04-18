@@ -16,6 +16,8 @@ using System.Data.Entity; // <--- ДОБАВЬТЕ ЭТУ СТРОКУ
 using System.Runtime.InteropServices; // Для Marshal.ReleaseComObject
 using Excel = Microsoft.Office.Interop.Excel; // Псевдоним для удобства
 using Microsoft.Win32;
+using System.Reflection; // Для Type.Missing
+using Word = Microsoft.Office.Interop.Word; // Псевдоним для Word
 
 
 namespace Buses_Try_14
@@ -474,5 +476,187 @@ namespace Buses_Try_14
             }
 
         }
+
+        private void BtnExportBusesToWord_Click(object sender, RoutedEventArgs e)
+        {
+            List<Buses> allBusesWithSchedules;
+            Dictionary<int, int> ticketsPerSchedule = new Dictionary<int, int>();
+
+            try
+            {
+                using (var context = new BusStationEntities())
+                {
+                    allBusesWithSchedules = context.Buses
+                        .Include(b => b.Schedules.Select(s => s.Routes))
+                        .OrderBy(b => b.Number)
+                        .ToList();
+
+                    ticketsPerSchedule = context.Tickets
+                        .GroupBy(t => t.ScheduleID)
+                        .ToDictionary(g => g.Key, g => g.Count());
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных для экспорта: {ex.Message}", "Ошибка данных", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (!allBusesWithSchedules.Any())
+            {
+                MessageBox.Show("Нет данных по автобусам для экспорта.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            Word.Application wordApp = null;
+            Word.Document document = null;
+            object missing = Missing.Value;
+
+            try
+            {
+                wordApp = new Word.Application();
+                document = wordApp.Documents.Add(ref missing, ref missing, ref missing, ref missing);
+
+                bool firstBus = true;
+
+                foreach (var bus in allBusesWithSchedules)
+                {
+                    Word.Range contentRange = document.Content;
+
+                    if (!firstBus)
+                    {
+                        object collapseDirection = Word.WdCollapseDirection.wdCollapseEnd;
+                        contentRange.Collapse(ref collapseDirection);
+                        contentRange.InsertBreak(Word.WdBreakType.wdPageBreak);
+                    }
+                    firstBus = false;
+
+                    // Заголовок автобуса
+                    Word.Paragraph paraBusHeader = document.Content.Paragraphs.Add(ref missing);
+                    paraBusHeader.Range.Text = $"Автобус №: {bus.Number}";
+                    paraBusHeader.Range.Font.Bold = 1;
+                    paraBusHeader.Range.Font.Size = 16;
+                    paraBusHeader.Format.SpaceAfter = 12;
+                    paraBusHeader.Range.InsertParagraphAfter();
+
+                    // Информация об автобусе
+                    Word.Paragraph paraBusInfo = document.Content.Paragraphs.Add(ref missing);
+                    paraBusInfo.Range.Font.Size = 12;
+                    paraBusInfo.Format.SpaceAfter = 6;
+                    paraBusInfo.Range.Text = $"Тип: {bus.Type ?? "-"}";
+                    paraBusInfo.Range.InsertParagraphAfter();
+
+                    paraBusInfo = document.Content.Paragraphs.Add(ref missing);
+                    paraBusInfo.Range.Text = $"Количество мест: {bus.CountOfSeats}";
+                    paraBusInfo.Range.InsertParagraphAfter();
+
+                    int totalPassengers = 0;
+                    if (bus.Schedules != null)
+                    {
+                        foreach (var schedule in bus.Schedules)
+                        {
+                            if (ticketsPerSchedule.TryGetValue(schedule.Id, out int count))
+                                totalPassengers += count;
+                        }
+                    }
+
+                    paraBusInfo = document.Content.Paragraphs.Add(ref missing);
+                    paraBusInfo.Range.Text = $"Всего перевезено пассажиров (по билетам): {totalPassengers}";
+                    paraBusInfo.Range.InsertParagraphAfter();
+                    paraBusInfo.Range.InsertParagraphAfter();
+
+                    // Таблица рейсов
+                    if (bus.Schedules != null && bus.Schedules.Any())
+                    {
+                        Word.Paragraph paraTableTitle = document.Content.Paragraphs.Add(ref missing);
+                        paraTableTitle.Range.Text = "История назначенных рейсов:";
+                        paraTableTitle.Range.Font.Bold = 1;
+                        paraTableTitle.Range.Font.Size = 12;
+                        paraTableTitle.Format.SpaceAfter = 6;
+                        paraTableTitle.Range.InsertParagraphAfter();
+
+                        int numRows = bus.Schedules.Count + 1;
+                        int numCols = 4;
+                        object endOfDoc = "\\endofdoc";
+                        Word.Range tableRange = document.Bookmarks.get_Item(ref endOfDoc).Range;
+                        Word.Table scheduleTable = document.Tables.Add(tableRange, numRows, numCols, ref missing, ref missing);
+                        scheduleTable.Borders.Enable = 1;
+                        scheduleTable.Range.Font.Size = 11;
+
+                        // Заголовки
+                        scheduleTable.Cell(1, 1).Range.Text = "Дата";
+                        scheduleTable.Cell(1, 2).Range.Text = "Время отпр.";
+                        scheduleTable.Cell(1, 3).Range.Text = "Маршрут";
+                        scheduleTable.Cell(1, 4).Range.Text = "Пасс.";
+                        scheduleTable.Rows[1].Range.Font.Bold = 1;
+                        scheduleTable.Rows[1].Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphCenter;
+
+                        int row = 2;
+                        foreach (var schedule in bus.Schedules.OrderBy(s => s.DepartureData).ThenBy(s => s.DepartureTime))
+                        {
+                            scheduleTable.Cell(row, 1).Range.Text = schedule.DepartureData.ToString("dd.MM.yyyy");
+                            scheduleTable.Cell(row, 2).Range.Text = schedule.DepartureTime.ToString(@"hh\:mm");
+                            scheduleTable.Cell(row, 3).Range.Text = schedule.Routes?.RouteDescription ?? "N/A";
+
+                            int passCount = ticketsPerSchedule.TryGetValue(schedule.Id, out int pCount) ? pCount : 0;
+                            scheduleTable.Cell(row, 4).Range.Text = passCount.ToString();
+                            scheduleTable.Cell(row, 4).Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphCenter;
+                            row++;
+                        }
+                    }
+                    else
+                    {
+                        Word.Paragraph paraNoSched = document.Content.Paragraphs.Add(ref missing);
+                        paraNoSched.Range.Text = "Нет назначенных рейсов для этого автобуса.";
+                        paraNoSched.Range.InsertParagraphAfter();
+                    }
+                }
+
+                SaveFileDialog saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "Документ Word (*.docx)|*.docx|Документ Word 97-2003 (*.doc)|*.doc",
+                    Title = "Сохранить отчет по автобусам",
+                    FileName = $"BusReport_{DateTime.Now:yyyyMMdd}.docx"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    object fileName = saveFileDialog.FileName;
+                    object fileFormat = saveFileDialog.FilterIndex == 1 ?
+                        Word.WdSaveFormat.wdFormatXMLDocument :
+                        Word.WdSaveFormat.wdFormatDocument;
+
+                    document.SaveAs2(ref fileName, ref fileFormat, ref missing, ref missing, ref missing,
+                                     ref missing, ref missing, ref missing, ref missing, ref missing,
+                                     ref missing, ref missing, ref missing, ref missing, ref missing,
+                                     ref missing);
+
+                    MessageBox.Show($"Отчет успешно сохранен в файл:\n{fileName}", "Экспорт завершен", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при экспорте в Word: {ex.Message}\n{ex.StackTrace}", "Ошибка экспорта", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                object falseObj = false;
+                if (document != null)
+                {
+                    document.Close(ref falseObj, ref missing, ref missing);
+                    Marshal.ReleaseComObject(document);
+                    document = null;
+                }
+                if (wordApp != null)
+                {
+                    wordApp.Quit(ref falseObj, ref missing, ref missing);
+                    Marshal.ReleaseComObject(wordApp);
+                    wordApp = null;
+                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+
     }
 }

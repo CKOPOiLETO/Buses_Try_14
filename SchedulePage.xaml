@@ -57,6 +57,7 @@
             <Button Content="Продать билет" Name="BtnSellTicket" Click="BtnSellTicket_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Пассажиры рейса" Name="BtnViewPassengers" Click="BtnViewPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Экспорт в Excel" Name="BtnExportToExcel" Click="BtnExportToExcel_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
+            <Button Content="Экспорт Word (Автобусы)" Name="BtnExportBusesToWord" Click="BtnExportBusesToWord_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
             <Button Content="Отчет по автобусам" HorizontalAlignment="Left" Margin="160,5,0,5" Padding="10,2"
         Name="BtnGoToReport" Click="BtnGoToReport_Click"/>
             
