@@ -35,52 +35,55 @@ namespace Buses_Try_14
 
         // Метод для загрузки и отображения данных
         // Обновленный метод для загрузки данных с учетом фильтров
-        private void LoadScheduleData(string departureFilter = null, string destinationFilter = null, DateTime? dateFilter = null)
+        private void LoadScheduleData(DateTime? dateFilter = null)
         {
-            using (var context = new BusStationEntities())
+            // Получаем выбранные значения из RouteSelector по его имени (x:Name)
+            // Используем ?. на случай, если контрол еще не инициализирован
+            string selectedDeparture = FilterRouteSelector?.SelectedDeparturePoint;
+            string selectedDestination = FilterRouteSelector?.SelectedDestinationPoint;
+
+            using (var context = new BusStationEntities()) // Используем ваш контекст
             {
                 try
                 {
-                    // Начинаем с базового запроса, включая связанные сущности
                     IQueryable<Schedules> query = context.Schedules
                                                          .Include(s => s.Routes)
                                                          .Include(s => s.Buses);
 
-                    // Применяем фильтр по пункту отправления (по подстроке, без учета регистра)
-                    if (!string.IsNullOrWhiteSpace(departureFilter))
+                    // --- ОБНОВЛЕННАЯ ФИЛЬТРАЦИЯ ПО МАРШРУТУ ---
+                    // Применяем фильтр, если пункт отправления выбран в RouteSelector
+                    if (!string.IsNullOrWhiteSpace(selectedDeparture))
                     {
-                        string lowerDepartureFilter = departureFilter.ToLower();
-                        query = query.Where(s => s.Routes.DepartuePoint.ToLower().Contains(lowerDepartureFilter));
+                        // Сравнение на точное совпадение
+                        query = query.Where(s => s.Routes.DepartuePoint == selectedDeparture);
                     }
 
-                    // Применяем фильтр по пункту назначения (по подстроке, без учета регистра)
-                    if (!string.IsNullOrWhiteSpace(destinationFilter))
+                    // Применяем фильтр, если пункт назначения выбран в RouteSelector
+                    if (!string.IsNullOrWhiteSpace(selectedDestination))
                     {
-                        string lowerDestinationFilter = destinationFilter.ToLower();
-                        query = query.Where(s => s.Routes.Destination.ToLower().Contains(lowerDestinationFilter));
+                        // Сравнение на точное совпадение
+                        query = query.Where(s => s.Routes.Destination == selectedDestination);
                     }
+                    // --- КОНЕЦ ОБНОВЛЕНИЯ ФИЛЬТРАЦИИ МАРШРУТА ---
 
-                    // Применяем фильтр по дате (точное совпадение дня, месяца, года)
+                    // Фильтр по дате остается как был
                     if (dateFilter.HasValue)
                     {
-                        DateTime dateToFilter = dateFilter.Value.Date; // Убираем время из выбранной даты
-                        // Используем DbFunctions.TruncateTime для сравнения только дат в базе данных
+                        DateTime dateToFilter = dateFilter.Value.Date;
                         query = query.Where(s => DbFunctions.TruncateTime(s.DepartureData) == dateToFilter);
                     }
 
-                    // Выполняем итоговый запрос с сортировкой
-                    var scheduleList = query.OrderBy(s => s.DepartureData) // Сортируем по дате
-                                            .ThenBy(s => s.DepartureTime) // Затем по времени
+                    var scheduleList = query.OrderBy(s => s.DepartureData)
+                                            .ThenBy(s => s.DepartureTime)
                                             .ToList();
 
-                    // Устанавливаем результат как источник данных для DataGrid
                     DGridSchedules.ItemsSource = scheduleList;
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Ошибка загрузки данных: {ex.Message}\n\nВнутренняя ошибка:\n{ex.InnerException?.Message}",
                                     "Ошибка базы данных", MessageBoxButton.OK, MessageBoxImage.Error);
-                    DGridSchedules.ItemsSource = null; // Очищаем грид в случае ошибки
+                    DGridSchedules.ItemsSource = null;
                 }
             }
         }
@@ -88,10 +91,10 @@ namespace Buses_Try_14
         // Обновляем данные при появлении страницы на экране
         private void Page_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (Visibility == Visibility.Visible)
+            if (Visibility == Visibility.Visible && IsLoaded) // Проверяем IsLoaded, чтобы FilterRouteSelector был доступен
             {
-                // Загружаем данные с учетом текущих значений в полях фильтров
-                LoadScheduleData(TxtFilterDeparture.Text, TxtFilterDestination.Text, DpFilterDate.SelectedDate);
+                // Передаем только дату, значения маршрута возьмем из UserControl внутри метода
+                LoadScheduleData(DpFilterDate.SelectedDate);
             }
         }
 
@@ -249,15 +252,23 @@ namespace Buses_Try_14
 
         private void BtnApplyFilters_Click(object sender, RoutedEventArgs e)
         {
-            LoadScheduleData(TxtFilterDeparture.Text, TxtFilterDestination.Text, DpFilterDate.SelectedDate);
+            // Передаем только дату
+            LoadScheduleData(DpFilterDate.SelectedDate);
         }
 
         private void BtnResetFilters_Click(object sender, RoutedEventArgs e)
         {
-            // Очищаем поля ввода фильтров
-            TxtFilterDeparture.Text = "";
-            TxtFilterDestination.Text = "";
-            DpFilterDate.SelectedDate = null; // Сбрасываем выбранную дату
+            // Сбрасываем значения в UserControl и DatePicker
+            if (FilterRouteSelector != null) // Проверяем на null
+            {
+                FilterRouteSelector.SelectedDeparturePoint = null;
+                FilterRouteSelector.SelectedDestinationPoint = null;
+                // Также может потребоваться сбросить текст, если ComboBox IsEditable=True
+                FilterRouteSelector.ComboDeparturePoint.Text = string.Empty; // Пример, если ComboBox назван так внутри UserControl
+                FilterRouteSelector.ComboDestinationPoint.Text = string.Empty; // Пример
+            }
+
+            DpFilterDate.SelectedDate = null;
 
             // Загружаем все данные без фильтров
             LoadScheduleData();
@@ -270,20 +281,20 @@ namespace Buses_Try_14
 
         private void BtnExportToExcel_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Получаем ВСЕ данные расписания (без фильтров UI)
+          
             List<Schedules> allSchedules;
             try
             {
                 using (var context = new BusStationEntities())
                 {
                     allSchedules = context.Schedules
-                                        .Include(s => s.Routes) // Включаем Маршруты
-                                        .Include(s => s.Buses)  // Включаем Автобусы
-                                        .Where(s => s.Routes != null && s.Buses != null) // Исключаем рейсы без маршрута или автобуса
-                                        .OrderBy(s => s.Routes.DepartuePoint) // Сначала сортируем по маршруту
+                                        .Include(s => s.Routes) 
+                                        .Include(s => s.Buses)  
+                                        .Where(s => s.Routes != null && s.Buses != null) 
+                                        .OrderBy(s => s.Routes.DepartuePoint) 
                                         .ThenBy(s => s.Routes.Destination)
-                                        .ThenBy(s => s.DepartureData)      // Затем по дате
-                                        .ThenBy(s => s.DepartureTime)      // Затем по времени
+                                        .ThenBy(s => s.DepartureData)  
+                                        .ThenBy(s => s.DepartureTime)   
                                         .ToList();
                 }
             }
@@ -300,26 +311,25 @@ namespace Buses_Try_14
                 return;
             }
 
-            // 2. Группируем рейсы по маршруту
-            // Группируем по RouteID, но сохраняем и имя для заголовка листа
+        
             var groupedByRoute = allSchedules
                 .GroupBy(s => new { s.RouteID, RouteName = $"{s.Routes.DepartuePoint} - {s.Routes.Destination}" })
-                .OrderBy(g => g.Key.RouteName); // Сортируем группы по имени маршрута
+                .OrderBy(g => g.Key.RouteName); 
 
-            // 3. Создаем Excel приложение и книгу
+       
             Excel.Application excelApp = null;
             Excel.Workbook workbook = null;
 
             try
             {
                 excelApp = new Excel.Application();
-                // excelApp.Visible = true; // Можно сделать видимым для отладки
-                excelApp.DisplayAlerts = false; // Отключаем стандартные окна Excel
-                workbook = excelApp.Workbooks.Add(Type.Missing); // Добавляем новую книгу
+                // excelApp.Visible = true; 
+                excelApp.DisplayAlerts = false; 
+                workbook = excelApp.Workbooks.Add(Type.Missing); 
 
                 int sheetIndex = 0;
 
-                // 4. Создаем лист для каждого маршрута
+               
                 foreach (var routeGroup in groupedByRoute)
                 {
                     sheetIndex++;
@@ -328,14 +338,14 @@ namespace Buses_Try_14
                     // Получаем или добавляем лист
                     if (sheetIndex == 1 && workbook.Sheets.Count >= 1)
                     {
-                        worksheet = (Excel.Worksheet)workbook.Sheets[1]; // Используем первый лист
+                        worksheet = (Excel.Worksheet)workbook.Sheets[1]; 
                     }
                     else
                     {
                         worksheet = (Excel.Worksheet)workbook.Sheets.Add(After: workbook.Sheets[workbook.Sheets.Count]); // Добавляем новый лист в конец
                     }
 
-                    // --- Настройка Листа ---
+                 
                     // Задаем имя листа (очищаем от недопустимых символов и обрезаем до 31)
                     string routeName = routeGroup.Key.RouteName;
                     string safeSheetName = string.Join("_", routeName.Split(System.IO.Path.GetInvalidFileNameChars())).Replace(":", "-");
@@ -343,7 +353,7 @@ namespace Buses_Try_14
                     if (string.IsNullOrWhiteSpace(safeSheetName)) safeSheetName = $"Route_{routeGroup.Key.RouteID}";
                     worksheet.Name = safeSheetName;
 
-                    int currentRow = 1; // Начинаем с первой строки
+                    int currentRow = 1; 
 
                     // Заголовок листа
                     worksheet.Cells[currentRow, 1] = $"История рейсов: {routeName}";
@@ -369,65 +379,56 @@ namespace Buses_Try_14
                     titleRange.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
                     currentRow++;
 
-                    // --- Заполнение Данными ---
+                 
                     foreach (var schedule in routeGroup.OrderBy(s => s.DepartureData).ThenBy(s => s.DepartureTime))
                     {
-                        // Внутри цикла foreach (var schedule in routeGroup...)
+                  
 
-                        // Запись даты обычно проходит нормально
+                      
                         worksheet.Cells[currentRow, 1] = schedule.DepartureData;
 
-                        // Преобразуем TimeSpan в дробное число дней для Excel
+                
                         worksheet.Cells[currentRow, 2] = schedule.DepartureTime.TotalDays;
                         worksheet.Cells[currentRow, 3] = schedule.ArrivalTime.TotalDays;
 
-                        // Остальные присваивания
+                   
                         worksheet.Cells[currentRow, 4] = schedule.Buses?.Number;
                         worksheet.Cells[currentRow, 5] = schedule.Buses?.Type;
                         worksheet.Cells[currentRow, 6] = schedule.Buses?.CountOfSeats;
                         currentRow++;
                     }
 
-                    // --- Форматирование столбцов (ПОСЛЕ ЗАПИСИ ВСЕХ ДАННЫХ) ---
-                    // Форматируем весь диапазон данных для скорости (от startDataRow до currentRow-1)
-                    if (currentRow - 1 >= startDataRow) // Проверяем, были ли данные вообще
+              
+                    if (currentRow - 1 >= startDataRow) 
                     {
                         Excel.Range dateDataRange = worksheet.Range[worksheet.Cells[startDataRow, 1], worksheet.Cells[currentRow - 1, 1]];
-                        dateDataRange.NumberFormat = "dd.MM.yyyy"; // Стандартный формат даты
+                        dateDataRange.NumberFormat = "dd.MM.yyyy"; 
 
                         Excel.Range timeDataRange1 = worksheet.Range[worksheet.Cells[startDataRow, 2], worksheet.Cells[currentRow - 1, 2]];
-                        timeDataRange1.NumberFormat = "hh:mm"; // Стандартный формат времени
+                        timeDataRange1.NumberFormat = "hh:mm"; 
 
                         Excel.Range timeDataRange2 = worksheet.Range[worksheet.Cells[startDataRow, 3], worksheet.Cells[currentRow - 1, 3]];
-                        timeDataRange2.NumberFormat = "hh:mm"; // Стандартный формат времени
+                        timeDataRange2.NumberFormat = "hh:mm"; 
 
-                        // Можно добавить форматирование для числовых колонок автобуса, если нужно
-                        // Excel.Range busNumberRange = worksheet.Range[worksheet.Cells[startDataRow, 4], worksheet.Cells[currentRow - 1, 4]];
-                        // busNumberRange.NumberFormat = "0"; // Как целое число
-                        // Excel.Range busSeatsRange = worksheet.Range[worksheet.Cells[startDataRow, 6], worksheet.Cells[currentRow - 1, 6]];
-                        // busSeatsRange.NumberFormat = "0";
                     }
 
-                    // Автоподбор ширины столбцов (вызываем один раз для всего листа после всех операций)
+ 
                     worksheet.Columns.AutoFit();
 
-                    // Освобождаем COM объект листа (важно делать в цикле)
                     if (worksheet != null) Marshal.ReleaseComObject(worksheet);
                     worksheet = null;
 
-                } // Конец цикла по маршрутам
+                } 
 
-
-                // 5. Удаление лишних листов (если Excel создал больше, чем нужно)
-                // Excel часто создает 3 листа по умолчанию. Удалим те, что не использовали.
+           
                 while (workbook.Sheets.Count > sheetIndex)
                 {
-                    // Удаляем последний лист, пока количество не совпадет с нужным
+                  
                     ((Excel.Worksheet)workbook.Sheets[workbook.Sheets.Count]).Delete();
                 }
 
 
-                // 6. Сохранение файла
+             
                 SaveFileDialog saveFileDialog = new SaveFileDialog
                 {
                     Filter = "Книга Excel (*.xlsx)|*.xlsx|Книга Excel 97-2003 (*.xls)|*.xls",
@@ -437,7 +438,7 @@ namespace Buses_Try_14
 
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    // Определяем формат сохранения по выбранному фильтру
+                
                     Excel.XlFileFormat fileFormat = saveFileDialog.FilterIndex == 1 ?
                         Excel.XlFileFormat.xlOpenXMLWorkbook : // .xlsx
                         Excel.XlFileFormat.xlWorkbookNormal;   // .xls
@@ -448,7 +449,7 @@ namespace Buses_Try_14
                                     Type.Missing, Type.Missing, Type.Missing);
                     MessageBox.Show($"Отчет успешно сохранен в файл:\n{saveFileDialog.FileName}", "Экспорт завершен", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                // Если пользователь не выбрал файл, просто закрываем без сохранения
+              
 
             }
             catch (Exception ex)
@@ -457,10 +458,10 @@ namespace Buses_Try_14
             }
             finally
             {
-                // 7. ОЧЕНЬ ВАЖНО: Закрытие Excel и освобождение COM объектов
+               
                 if (workbook != null)
                 {
-                    workbook.Close(false, Type.Missing, Type.Missing); // Закрываем книгу без сохранения изменений (уже сохранили через SaveAs)
+                    workbook.Close(false, Type.Missing, Type.Missing); 
                     Marshal.ReleaseComObject(workbook);
                     workbook = null;
                 }
@@ -470,7 +471,7 @@ namespace Buses_Try_14
                     Marshal.ReleaseComObject(excelApp);
                     excelApp = null;
                 }
-                // Запускаем сборку мусора для надежности
+                // Запускаем сборку мусора 
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }

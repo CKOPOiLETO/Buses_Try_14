@@ -1,0 +1,27 @@
+﻿<UserControl x:Class="Buses_Try_14.RouteSelector"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Buses_Try_14"
+             mc:Ignorable="d"
+             d:DesignHeight="120" d:DesignWidth="400">
+    <StackPanel Orientation="Vertical">
+
+        <TextBlock Text="Откуда:" Margin="0,0,0,2"/>
+        <ComboBox x:Name="ComboDeparturePoint"
+                  ItemsSource="{Binding DeparturePoints}"
+                  SelectedItem="{Binding SelectedDeparturePoint, UpdateSourceTrigger=PropertyChanged}"
+                  IsEditable="True"
+                  Margin="0,0,0,5"/>
+        <TextBlock Text="Куда:" Margin="0,0,0,2"/>
+        <ComboBox x:Name="ComboDestinationPoint"
+                  ItemsSource="{Binding DestinationPoints}"
+                  SelectedItem="{Binding SelectedDestinationPoint, UpdateSourceTrigger=PropertyChanged}"
+                  IsEditable="True"
+                  Margin="0,0,0,10"/>
+
+        <TextBlock x:Name="TextBlockRouteInfo" Text="{Binding RouteInfoText}" MinHeight="20" TextWrapping="Wrap"/>
+
+    </StackPanel>
+</UserControl>

@@ -5,7 +5,8 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Buses_Try_14"
       mc:Ignorable="d"
-      d:DesignHeight="500" d:DesignWidth="850" Title="Расписание рейсов" IsVisibleChanged="Page_IsVisibleChanged">
+      d:DesignHeight="550" d:DesignWidth="950"
+      Title="Расписание рейсов" IsVisibleChanged="Page_IsVisibleChanged">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -15,54 +16,60 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Откуда:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox x:Name="TxtFilterDeparture" Width="140" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по пункту отправления"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Куда:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox x:Name="TxtFilterDestination" Width="140" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по пункту назначения"/>
+                <local:RouteSelector x:Name="FilterRouteSelector" Grid.Column="0"
+                                     VerticalAlignment="Center" Margin="0,0,10,0"
+                                     Width="350" ToolTip="Выберите пункты отправления и/или назначения"/>
+                <TextBlock Text="Дата:" Grid.Column="1" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                <DatePicker x:Name="DpFilterDate" Grid.Column="2" Width="130" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по дате отправления"/>
 
-                <TextBlock Text="Дата:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <DatePicker x:Name="DpFilterDate" Width="130" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="Фильтр по дате отправления"/>
-
-                <Button Content="Применить" Name="BtnApplyFilters" Click="BtnApplyFilters_Click" Padding="10,3" Margin="10,0,5,0" VerticalAlignment="Center" ToolTip="Применить выбранные фильтры"/>
-                <Button Content="Сбросить" Name="BtnResetFilters" Click="BtnResetFilters_Click" Padding="10,3" VerticalAlignment="Center" ToolTip="Очистить все фильтры"/>
-            </StackPanel>
+                <Button Content="Применить" Grid.Column="4" Name="BtnApplyFilters" Click="BtnApplyFilters_Click" Padding="10,3" Margin="10,0,5,0" VerticalAlignment="Center" ToolTip="Применить выбранные фильтры"/>
+                <Button Content="Сбросить" Grid.Column="5" Name="BtnResetFilters" Click="BtnResetFilters_Click" Padding="10,3" VerticalAlignment="Center" ToolTip="Очистить все фильтры"/>
+            </Grid>
         </Border>
 
         <DataGrid x:Name="DGridSchedules" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
-                  SelectionMode="Extended">
+                  SelectionMode="Extended" CanUserAddRows="False" CanUserDeleteRows="False"
+                  AlternatingRowBackground="Gainsboro" GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Пункт отправления" Binding="{Binding Routes.DepartuePoint}" Width="*"/>
-                <DataGridTextColumn Header="Пункт назначения" Binding="{Binding Routes.Destination}" Width="*"/>
-                <DataGridTextColumn Header="Дата отправления" Binding="{Binding DepartureData, StringFormat='dd.MM.yyyy'}" Width="120"/>
-                <DataGridTextColumn Header="Время отправления" Binding="{Binding DepartureTime, StringFormat='hh\\:mm'}" Width="120"/>
-                <DataGridTextColumn Header="Время прибытия" Binding="{Binding ArrivalTime, StringFormat='hh\\:mm'}" Width="120"/>
-                <DataGridTextColumn Header="Номер автобуса" Binding="{Binding Buses.Number}" Width="100"/>
+                <DataGridTextColumn Header="Пункт отправления" Binding="{Binding Routes.DepartuePoint}" Width="1.5*"/>
+                <DataGridTextColumn Header="Пункт назначения" Binding="{Binding Routes.Destination}" Width="1.5*"/>
+                <DataGridTextColumn Header="Дата" Binding="{Binding DepartureData, StringFormat='dd.MM.yyyy'}" Width="Auto"/>
+                <DataGridTextColumn Header="Отпр." Binding="{Binding DepartureTime, StringFormat='hh\\:mm'}" Width="Auto"/>
+                <DataGridTextColumn Header="Приб." Binding="{Binding ArrivalTime, StringFormat='hh\\:mm'}" Width="Auto"/>
+                <DataGridTextColumn Header="Автобус №" Binding="{Binding Buses.Number}" Width="Auto"/>
                 
-                <DataGridTemplateColumn Width="auto" Header="Действие">
+                <DataGridTemplateColumn Width="Auto" Header="Действие">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="Редактировать" Name="BtnEdit" Click="BtnEdit_Click" Margin="5"/>
+                            <Button Content="Редактировать" Name="BtnEdit" Click="BtnEdit_Click" Padding="5,2" Margin="2"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Stretch" Margin="10">
-            <Button Content="Добавить рейс" Name="BtnAdd" Click="BtnAdd_Click" Padding="10,5" Margin="0,0,10,0"/>
-            <Button Content="Удалить рейс(ы)" Name="BtnDelete" Click="BtnDelete_Click" Padding="10,5" Background="LightCoral"/>
-            <Button Content="Пассажиры" Name="BtnGoToPassengers" Click="BtnGoToPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            <Button Content="Продать билет" Name="BtnSellTicket" Click="BtnSellTicket_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            <Button Content="Пассажиры рейса" Name="BtnViewPassengers" Click="BtnViewPassengers_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            <Button Content="Экспорт в Excel" Name="BtnExportToExcel" Click="BtnExportToExcel_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            <Button Content="Экспорт Word (Автобусы)" Name="BtnExportBusesToWord" Click="BtnExportBusesToWord_Click" Padding="10,5" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            <Button Content="Отчет по автобусам" HorizontalAlignment="Left" Margin="160,5,0,5" Padding="10,2"
-        Name="BtnGoToReport" Click="BtnGoToReport_Click"/>
-            
-            
-        </StackPanel>
+        <Border Grid.Row="2" BorderBrush="LightGray" BorderThickness="0,1,0,0" Padding="5">
+            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Content="Добавить рейс" Name="BtnAdd" Click="BtnAdd_Click" Padding="10,5" Margin="5"/>
+                <Button Content="Удалить рейс(ы)" Name="BtnDelete" Click="BtnDelete_Click" Padding="10,5" Background="LightCoral" Foreground="White" Margin="5"/>
+                <Button Content="Пассажиры" Name="BtnGoToPassengers" Click="BtnGoToPassengers_Click" Padding="10,5" Margin="5"/>
+                <Button Content="Продать билет" Name="BtnSellTicket" Click="BtnSellTicket_Click" Padding="10,5" Margin="5"/>
+                <Button Content="Пассажиры рейса" Name="BtnViewPassengers" Click="BtnViewPassengers_Click" Padding="10,5" Margin="5"/>
+                <Button Content="Экспорт в Excel" Name="BtnExportToExcel" Click="BtnExportToExcel_Click" Padding="10,5" Margin="5"/>
+                <Button Content="Экспорт Word (Автобусы)" Name="BtnExportBusesToWord" Click="BtnExportBusesToWord_Click" Padding="10,5" Margin="5"/>
+                <Button Content="Отчет по автобусам" Name="BtnGoToReport" Click="BtnGoToReport_Click" Padding="10,5" Margin="5"/>
+            </WrapPanel>
+        </Border>
 
     </Grid>
 </Page>
